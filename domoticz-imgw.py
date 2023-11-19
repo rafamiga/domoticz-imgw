@@ -17,7 +17,7 @@ import datetime
 # "cisnienie":"1017.9"}
 
 DEBUG = False
-#DEBUG = True
+# DEBUG = True
 
 CZUJNIKI = {
     # IMGW ID : [ temp+bar+wilg idx, wiatr idx, opad idx ]
@@ -27,6 +27,9 @@ CZUJNIKI = {
 }
 
 for czuj in CZUJNIKI:
+    WIATR_OK = True
+    wiatr = 0
+
     try:
         czUrl = "https://danepubliczne.imgw.pl/api/data/synop/id/" + czuj
         if DEBUG: print(czUrl)
@@ -36,14 +39,20 @@ for czuj in CZUJNIKI:
 
         if r.status_code != 200:
             raise Exception("JSON request failed, status code=%i url=%s" % (r.status_code, czUrl))
-
+            
         j = json.loads(r.text)
 
         if DEBUG: print(j)
 
         cisn = 0
         temp = float(j['temperatura'])
-        wiatr = float(j['predkosc_wiatru']) # m/s
+
+        # czasami nie ma wartości dla wiatru
+        if 'predkosc_wiatru' in j and j['predkosc_wiatru'] is not None:
+            wiatr = float(j['predkosc_wiatru']) # m/s
+        else:
+            WIATR_OK = False
+            
         wkier = int(j['kierunek_wiatru'])
         wilgp = float(j['wilgotnosc_wzgledna'])
         opad = float(j['suma_opadu'])
@@ -53,7 +62,7 @@ for czuj in CZUJNIKI:
 
         da = datetime.datetime.now()
 
-        if DEBUG: print("[%s] temp=%.2f wiatr=%.2f wkier=%i wilgp=%.2f opad=%.2f cisn=%.2f" % (da,temp,wiatr,wkier,wilgp,opad,cisn))
+        if DEBUG: print("[%s] temp=%.2f wiatr=%.2f wkier=%i wilgp=%.2f opad=%.2f cisn=%.2f WIATR_OK=%s" % (da,temp,wiatr,wkier,wilgp,opad,cisn,WIATR_OK))
 
         idxTemp = CZUJNIKI[czuj][0]
         if idxTemp > 0:
@@ -63,7 +72,7 @@ for czuj in CZUJNIKI:
 
     # https://www.domoticz.com/wiki/Domoticz_API/JSON_URL's#Wind
         idxWiatr = CZUJNIKI[czuj][1]
-        if idxWiatr > 0:
+        if idxWiatr > 0 and WIATR_OK:
             dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
             ix = int((wkier + 11.25)/22.5)
             wdir = dirs[ix % 16]
